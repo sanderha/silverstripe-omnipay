@@ -44,6 +44,43 @@ class PaymentGatewayController extends Controller{
 			->filter("ClassName", array("PurchaseRequest","AuthorizeRequest"))
 			->first();
 
+		// should there not also be AuthorizeCaptureService?
+		$service = AuthorizeCaptureService::create($payment);
+
+		//redirect if payment is already a success
+		if ($payment->isComplete()) {
+			return $this->redirect($this->getSuccessUrl($message));
+		}
+
+		//do the payment update
+		$response = null;
+		switch ($this->request->param('Status')) {
+			case "complete":
+				$serviceResponse = $service->completeAuthorize();
+
+				if($serviceResponse->isSuccessful()){
+					$response = $this->redirect($this->getSuccessUrl($message));
+				} else {
+					$response = $this->redirect($this->getFailureUrl($message));
+				}
+				break;
+			case "notify":
+				$serviceResponse = $service->completeAuthorize();
+				// Allow implementations where no redirect happens,
+				// since gateway failsafe callbacks might expect a 2xx HTTP response
+				$response = new SS_HTTPResponse('', 200);
+				break;
+			case "cancel":
+				$service->cancelAuthorize();
+				$response = $this->redirect($this->getFailureUrl($message));
+				break;
+			default:
+				$response = $this->httpError(404, _t("Payment.INVALIDURL", "Invalid payment url."));
+		}
+
+
+		// use Purchase (direct purchase - instant capture of money)
+/*
 		$service = PurchaseService::create($payment);
 		
 		//redirect if payment is already a success
@@ -75,7 +112,7 @@ class PaymentGatewayController extends Controller{
 			default:
 				$response = $this->httpError(404, _t("Payment.INVALIDURL", "Invalid payment url."));
 		}
-
+*/
 		return $response;
 	}
 
