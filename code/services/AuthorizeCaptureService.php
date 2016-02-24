@@ -118,6 +118,8 @@ class AuthorizeCaptureService extends PaymentService{
 			$response = $this->response = $request->send();
 			$gatewayresponse->setOmnipayResponse($response);
 			if ($response->isSuccessful()) {
+				// This $response is CompletePurchaseResponse in our quickpay driver
+
 				$this->createMessage('AuthorizedResponse', $response);
 				$this->payment->Status = 'Authorized';
 				$this->payment->write();
@@ -138,6 +140,44 @@ class AuthorizeCaptureService extends PaymentService{
 	 */
 	public function capture() {
 		//TODO
+
+		$gatewayresponse = $this->createGatewayResponse();
+
+		// get payment info and transactionreference
+		$gatewaydata = array(
+			'amount' => (float) $this->payment->MoneyAmount,
+			'transactionId' => $this->payment->OrderID // TODO this is not correct. Should be reference field on GatewayMessage
+		);
+
+		// get gateway
+		// call capture method on the gateway
+		$request = $this->oGateway()->capture($gatewaydata);
+
+		$this->createMessage('CaptureRequest', $request);
+		// get response to make sure it is paid.
+		$response = null;
+		try {
+			$response = $this->response = $request->send();
+			$gatewayresponse->setOmnipayResponse($response);
+			if ($response->isSuccessful()) {
+				// This $response should be CaptureResponse
+
+				$this->createMessage('CapturedResponse', $response);
+				$this->payment->Status = 'Captured';
+				$this->payment->write();
+				$this->payment->extend('onCaptured', $gatewayresponse);
+			} else {
+				$this->createMessage('CaptureError', $response);
+			}
+		} catch (Omnipay\Common\Exception\OmnipayException $e) {
+			$this->createMessage("CaptureError", $e);
+		}
+
+		return $gatewayresponse;
+
+
+		// return reponse
+
 	}
 
 	/**
@@ -148,6 +188,8 @@ class AuthorizeCaptureService extends PaymentService{
 	}
 
 	public function cancelAuthorize(){
+		// connect to Quickpay and cancel payment
+
 		$this->payment->Status = 'Void';
 		$this->payment->write();
 		$this->createMessage('VoidRequest', array(
