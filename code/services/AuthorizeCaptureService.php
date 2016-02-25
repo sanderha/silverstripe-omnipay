@@ -72,7 +72,7 @@ class AuthorizeCaptureService extends PaymentService{
 				$this->payment->Status = 'Authorized';
 				$gatewayresponse->setMessage("Payment authorized");
 				$this->payment->write();
-				$this->payment->extend('onCaptured', $gatewayresponse);
+
 			} elseif ($response->isRedirect()) {
 				// redirect to off-site payment gateway
 				$this->createMessage('AuthorizeRedirectResponse', $response);
@@ -127,7 +127,8 @@ class AuthorizeCaptureService extends PaymentService{
 				$this->createMessage('AuthorizedResponse', $response);
 				$this->payment->Status = 'Authorized';
 				$this->payment->write();
-				$this->payment->extend('onCaptured', $gatewayresponse);
+
+				$this->payment->extend('onAuthorized', $gatewayresponse);
 			} else {
 				$this->createMessage('CompleteAuthorizeError', $response);
 			}
