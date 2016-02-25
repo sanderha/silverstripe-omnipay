@@ -10,9 +10,6 @@ class AuthorizeCaptureService extends PaymentService{
 	 * @return ResponseInterface omnipay's response class, specific to the chosen gateway.
 	 */
 	public function authorize($data = array()) {
-
-		// the following code is copied from the purchase method, from the PurchaseService class, and has been modded to fit authorize method
-
 		if ($this->payment->Status !== "Created") {
 			return null; //could be handled better? send payment response?
 		}
@@ -27,8 +24,7 @@ class AuthorizeCaptureService extends PaymentService{
 			$data['clientIp'] = Controller::curr()->getRequest()->getIP();
 		}
 
-		$gatewaydata = array_merge($data,array(
-			//'card' => $this->getCreditCard($data),
+		$gatewaydata = array_merge($data, array(
 			'amount' => (float) $this->payment->MoneyAmount,
 			'currency' => $this->payment->MoneyCurrency,
 			//set all gateway return/cancel/notify urls to PaymentGatewayController endpoint
@@ -49,9 +45,9 @@ class AuthorizeCaptureService extends PaymentService{
 			$gatewaydata['card'] = $this->getCreditCard($data);
 		}
 
-		$this->extend('onBeforeAuthorize', $gatewaydata);
+		$this->extend('onBeforePurchase', $gatewaydata);
 		$request = $this->oGateway()->authorize($gatewaydata);
-		$this->extend('onAfterAuthorize', $request);
+		$this->extend('onAfterPurchase', $request);
 
 		$message = $this->createMessage('AuthorizeRequest', $request);
 		$message->SuccessURL = $this->returnurl;
@@ -61,7 +57,7 @@ class AuthorizeCaptureService extends PaymentService{
 		$gatewayresponse = $this->createGatewayResponse();
 		try {
 			$response = $this->response = $request->send();
-			$this->extend('onAfterSendAuthorize', $request, $response);
+			$this->extend('onAfterSendPurchase', $request, $response);
 			$gatewayresponse->setOmnipayResponse($response);
 			//update payment model
 			if (GatewayInfo::is_manual($this->payment->Gateway)) {
@@ -74,9 +70,9 @@ class AuthorizeCaptureService extends PaymentService{
 				//successful payment
 				$this->createMessage('AuthorizedResponse', $response);
 				$this->payment->Status = 'Authorized';
-				$gatewayresponse->setMessage("Authorization of payment successful");
+				$gatewayresponse->setMessage("Payment authorized");
 				$this->payment->write();
-				$this->payment->extend('onAuthorized', $gatewayresponse);
+				$this->payment->extend('onCaptured', $gatewayresponse);
 			} elseif ($response->isRedirect()) {
 				// redirect to off-site payment gateway
 				$this->createMessage('AuthorizeRedirectResponse', $response);
@@ -96,7 +92,7 @@ class AuthorizeCaptureService extends PaymentService{
 		}
 		$gatewayresponse->setRedirectURL($this->getRedirectURL());
 
-		return $gatewayresponse; // Authorize response
+		return $gatewayresponse;
 	}
 
 	/**
@@ -105,9 +101,6 @@ class AuthorizeCaptureService extends PaymentService{
 	 * @return PaymentResponse encapsulated response info
 	 */
 	public function completeAuthorize() {
-
-		// the following code is copied from the purchase method, from the PurchaseService class, and has been modded to fit authorize method
-
 		$gatewayresponse = $this->createGatewayResponse();
 
 		//set the client IP address, if not already set
@@ -120,25 +113,21 @@ class AuthorizeCaptureService extends PaymentService{
 			'currency' => $this->payment->MoneyCurrency
 		));
 
-		$this->payment->extend('onBeforeCompleteAuthorize', $gatewaydata);
-
-		$request = $this->oGateway()->completeAuthorize($gatewaydata);
-
-		$this->payment->extend('onAfterCompleteAuthorize', $request);
+		$this->payment->extend('onBeforeCompletePurchase', $gatewaydata);
+		$request = $this->oGateway()->completePurchase($gatewaydata);
+		$this->payment->extend('onAfterCompletePurchase', $request);
 
 		$this->createMessage('CompleteAuthorizeRequest', $request);
 		$response = null;
 		try {
 			$response = $this->response = $request->send();
-			$this->extend('onAfterSendCompleteAuthorize', $request, $response);
+			$this->extend('onAfterSendCompletePurchase', $request, $response);
 			$gatewayresponse->setOmnipayResponse($response);
 			if ($response->isSuccessful()) {
-				// This $response is CompletePurchaseResponse in our quickpay driver
-
 				$this->createMessage('AuthorizedResponse', $response);
 				$this->payment->Status = 'Authorized';
 				$this->payment->write();
-				$this->payment->extend('onAuthorized', $gatewayresponse);
+				$this->payment->extend('onCaptured', $gatewayresponse);
 			} else {
 				$this->createMessage('CompleteAuthorizeError', $response);
 			}
