@@ -28,7 +28,7 @@ class AuthorizeCaptureService extends PaymentService{
 		}
 
 		$gatewaydata = array_merge($data,array(
-			'card' => $this->getCreditCard($data),
+			//'card' => $this->getCreditCard($data),
 			'amount' => (float) $this->payment->MoneyAmount,
 			'currency' => $this->payment->MoneyCurrency,
 			//set all gateway return/cancel/notify urls to PaymentGatewayController endpoint
@@ -37,11 +37,21 @@ class AuthorizeCaptureService extends PaymentService{
 			'notifyUrl' => $this->getEndpointURL("notify", $this->payment->Identifier)
 		));
 
+		// Often, the shop will want to pass in a transaction ID (order #, etc), but if there's
+		// not one we need to set it as Ominpay requires this.
 		if(!isset($gatewaydata['transactionId'])){
 			$gatewaydata['transactionId'] = $this->payment->Identifier;
 		}
 
+		// We only look for a card if we aren't already provided with a token
+		// Increasingly we can expect tokens or nonce's to be more common (e.g. Stripe and Braintree)
+		if (empty($gatewaydata['token'])) {
+			$gatewaydata['card'] = $this->getCreditCard($data);
+		}
+
+		$this->extend('onBeforeAuthorize', $gatewaydata);
 		$request = $this->oGateway()->authorize($gatewaydata);
+		$this->extend('onAfterAuthorize', $request);
 
 		$message = $this->createMessage('AuthorizeRequest', $request);
 		$message->SuccessURL = $this->returnurl;
@@ -51,6 +61,7 @@ class AuthorizeCaptureService extends PaymentService{
 		$gatewayresponse = $this->createGatewayResponse();
 		try {
 			$response = $this->response = $request->send();
+			$this->extend('onAfterSendAuthorize', $request, $response);
 			$gatewayresponse->setOmnipayResponse($response);
 			//update payment model
 			if (GatewayInfo::is_manual($this->payment->Gateway)) {
@@ -112,10 +123,14 @@ class AuthorizeCaptureService extends PaymentService{
 		$this->payment->extend('onBeforeCompleteAuthorize', $gatewaydata);
 
 		$request = $this->oGateway()->completeAuthorize($gatewaydata);
+
+		$this->payment->extend('onAfterCompleteAuthorize', $request);
+
 		$this->createMessage('CompleteAuthorizeRequest', $request);
 		$response = null;
 		try {
 			$response = $this->response = $request->send();
+			$this->extend('onAfterSendCompleteAuthorize', $request, $response);
 			$gatewayresponse->setOmnipayResponse($response);
 			if ($response->isSuccessful()) {
 				// This $response is CompletePurchaseResponse in our quickpay driver
@@ -144,14 +159,17 @@ class AuthorizeCaptureService extends PaymentService{
 		$gatewayresponse = $this->createGatewayResponse();
 
 		// get payment info and transactionreference
+		$msg = $this->payment->Messages()->filter(array('ClassName' => 'AuthorizedResponse'))->First();
+		$transactionRef = $msg->Reference;// reference field on GatewayMessage
+
 		$gatewaydata = array(
 			'amount' => (float) $this->payment->MoneyAmount,
-			'transactionId' => $this->payment->OrderID // TODO this is not correct. Should be reference field on GatewayMessage
+			'transactionId' => $this->payment->OrderID // Why is this so neccesary to have?
 		);
 
 		// get gateway
 		// call capture method on the gateway
-		$request = $this->oGateway()->capture($gatewaydata);
+		$request = $this->oGateway()->capture($gatewaydata)->setTransactionReference($transactionRef);
 
 		$this->createMessage('CaptureRequest', $request);
 		// get response to make sure it is paid.
