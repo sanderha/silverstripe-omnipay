@@ -149,7 +149,7 @@ class AuthorizeCaptureService extends PaymentService{
 		$gatewayresponse = $this->createGatewayResponse();
 
 		// get payment info and transactionreference
-		$msg = $this->payment->Messages()->filter(array('ClassName' => 'AuthorizedResponse'))->First();
+		$msg = $this->payment->Messages()->filter(array('ClassName' => 'CompleteAuthorizeRequest'))->First();
 		$transactionRef = $msg->Reference;// reference field on GatewayMessage
 
 		$gatewaydata = array(
