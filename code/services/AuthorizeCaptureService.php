@@ -149,9 +149,10 @@ class AuthorizeCaptureService extends PaymentService{
 		$gatewayresponse = $this->createGatewayResponse();
 
 		// get payment info and transactionreference
-		$msg = $this->payment->Messages()->filter(array('ClassName' => 'CompleteAuthorizeRequest'))->First();
-		$transactionRef = $msg->Reference;// reference field on GatewayMessage
-
+		// some use more messages for "complete" methods, while others, like Stripe, do it without "complete"
+		$msg_type_one = $this->payment->Messages()->filter(array('ClassName' => 'AuthorizedResponse'))->First();
+		$msg_type_two = $this->payment->Messages()->filter(array('ClassName' => 'CompleteAuthorizeRequest'))->First();
+		
 		$gatewaydata = array(
 			'amount' => (float) $this->payment->MoneyAmount,
 			'transactionId' => $this->payment->OrderID // Why is this so neccesary to have?
@@ -159,8 +160,18 @@ class AuthorizeCaptureService extends PaymentService{
 
 		// get gateway
 		// call capture method on the gateway
-		$request = $this->oGateway()->capture($gatewaydata)->setTransactionReference($transactionRef);
-
+		$request = $this->oGateway()->capture($gatewaydata);
+		
+		if($msg_type_one){
+			$transactionRef = $msg_type_one->Reference;
+		}
+		if($msg_type_two){
+			$transactionRef = $msg_type_two->Reference;
+		}
+		if($transactionRef){
+			$request->setTransactionReference($transactionRef);	
+		}
+		
 		$this->createMessage('CaptureRequest', $request);
 		// get response to make sure it is paid.
 		$response = null;
