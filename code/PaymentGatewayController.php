@@ -57,24 +57,15 @@ class PaymentGatewayController extends Controller{
 		switch ($this->request->param('Status')) {
 			case "complete":
 				// represents "continueurl" in Quickpay. When payment successful, they will be sent here
-				// because payment was succesful, write payment in our system
 				$serviceResponse = $service->completeAuthorize();
+				$response = $this->redirect($this->getSuccessUrl($message));
 
-				if($serviceResponse->isSuccessful()){
-					$response = $this->redirect($this->getSuccessUrl($message));
-				} else {
-					$response = $this->redirect($this->getFailureUrl($message));
-				}
 				break;
 			case "notify":
 				$serviceResponse = $service->completeAuthorize();
 				// Allow implementations where no redirect happens,
 				// since gateway failsafe callbacks might expect a 2xx HTTP response
 				$response = new SS_HTTPResponse('', 200);
-
-				// TODO if quickpay sends its callback to this, what does it include?
-				// TODO debug. This can only be done on a server so we have to wait
-				// we should check if we have get this callback information in through our quickpay driver so that we can return succesful etc.
 
 				break;
 			case "capture":
