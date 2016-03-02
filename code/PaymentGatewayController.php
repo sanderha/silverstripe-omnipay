@@ -25,6 +25,8 @@ class PaymentGatewayController extends Controller{
 		return Director::absoluteURL(
 			Controller::join_links('paymentendpoint', $identifier, $action)
 		);
+		// modded to go through ngrok instead, so we can test callbacks locally
+		//return "http://224cc5a8.ngrok.io/paymentendpoint/" . $identifier . '/' . $action;
 	}
 
 	/**
@@ -70,7 +72,8 @@ class PaymentGatewayController extends Controller{
 				break;
 			case "capture":
 				// do capture method
-				$service->capture();
+
+				$service->completeCapture();
 				break;
 			case "cancel":
 				$service->cancelAuthorize();
@@ -80,41 +83,6 @@ class PaymentGatewayController extends Controller{
 				$response = $this->httpError(404, _t("Payment.INVALIDURL", "Invalid payment url."));
 		}
 
-
-		// use Purchase (direct purchase - instant capture of money)
-/*
-		$service = PurchaseService::create($payment);
-		
-		//redirect if payment is already a success
-		if ($payment->isComplete()) {
-			return $this->redirect($this->getSuccessUrl($message));
-		}
-
-		//do the payment update
-		$response = null;
-		switch ($this->request->param('Status')) {
-			case "complete":
-				$serviceResponse = $service->completePurchase();
-				if($serviceResponse->isSuccessful()){
-					$response = $this->redirect($this->getSuccessUrl($message));
-				} else {
-					$response = $this->redirect($this->getFailureUrl($message));
-				}
-				break;
-			case "notify":
-				$serviceResponse = $service->completePurchase();
-				// Allow implementations where no redirect happens,
-				// since gateway failsafe callbacks might expect a 2xx HTTP response
-				$response = new SS_HTTPResponse('', 200);
-				break;
-			case "cancel":
-				//TODO: store cancellation message / void payment
-				$response = $this->redirect($this->getFailureUrl($message));
-				break;
-			default:
-				$response = $this->httpError(404, _t("Payment.INVALIDURL", "Invalid payment url."));
-		}
-*/
 		return $response;
 	}
 

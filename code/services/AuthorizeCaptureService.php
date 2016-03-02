@@ -45,9 +45,9 @@ class AuthorizeCaptureService extends PaymentService{
 			$gatewaydata['card'] = $this->getCreditCard($data);
 		}
 
-		$this->extend('onBeforePurchase', $gatewaydata);
+		$this->extend('onBeforeAuthorize', $gatewaydata);
 		$request = $this->oGateway()->authorize($gatewaydata);
-		$this->extend('onAfterPurchase', $request);
+		$this->extend('onAfterAuthorize', $request);
 
 		$message = $this->createMessage('AuthorizeRequest', $request);
 		$message->SuccessURL = $this->returnurl;
@@ -57,7 +57,7 @@ class AuthorizeCaptureService extends PaymentService{
 		$gatewayresponse = $this->createGatewayResponse();
 		try {
 			$response = $this->response = $request->send();
-			$this->extend('onAfterSendPurchase', $request, $response);
+			$this->extend('onAfterSendAuthorize', $request, $response);
 			$gatewayresponse->setOmnipayResponse($response);
 			//update payment model
 			if (GatewayInfo::is_manual($this->payment->Gateway)) {
@@ -100,7 +100,7 @@ class AuthorizeCaptureService extends PaymentService{
 	 * This is ususally only called by PaymentGatewayController.
 	 * @return PaymentResponse encapsulated response info
 	 */
-	public function completeAuthorize() {
+	public function completeAuthorize($data = array()) {
 		$gatewayresponse = $this->createGatewayResponse();
 
 		//set the client IP address, if not already set
@@ -114,7 +114,7 @@ class AuthorizeCaptureService extends PaymentService{
 		));
 
 		$this->payment->extend('onBeforeCompletePurchase', $gatewaydata);
-		$request = $this->oGateway()->completePurchase($gatewaydata);
+		$request = $this->oGateway()->completeAuthorize($gatewaydata);
 		$this->payment->extend('onAfterCompletePurchase', $request);
 
 		$this->createMessage('CompleteAuthorizeRequest', $request);
@@ -145,51 +145,84 @@ class AuthorizeCaptureService extends PaymentService{
 
 	/**
 	 * Do the capture of money on authorised credit card. Money exchanges hands.
-	 * @return PaymentResponse encapsulated response info
+	 * @return ResponseInterface encapsulated response info
 	 */
-	public function capture() {
-		//TODO
+	public function capture($data = array()) {
 
 		$gatewayresponse = $this->createGatewayResponse();
 
 		// get payment info and transactionreference
 		// some use more messages for "complete" methods, while others, like Stripe, do it without "complete"
-		$msg_type_one = $this->payment->Messages()->filter(array('ClassName' => 'AuthorizedResponse'))->First();
-		$msg_type_two = $this->payment->Messages()->filter(array('ClassName' => 'CompleteAuthorizeRequest'))->First();
+		$msg = $this->payment->Messages()->filter(array('ClassName' => 'AuthorizedResponse'))->Last();
 		
-		$gatewaydata = array(
+		$gatewaydata = array_merge($data, array(
 			'amount' => (float) $this->payment->MoneyAmount,
-			'transactionId' => $this->payment->OrderID // Why is this so neccesary to have?
-		);
+			'transactionId' => $this->payment->OrderID, // Why is this so neccesary to have?
+			'notifyUrl' => $this->getEndpointURL("capture", $this->payment->Identifier)
+		));
 
 		// get gateway
 		// call capture method on the gateway
 		$request = $this->oGateway()->capture($gatewaydata);
-		
-		if($msg_type_one){
-			$transactionRef = $msg_type_one->Reference;
-		}
-		if($msg_type_two){
-			$transactionRef = $msg_type_two->Reference;
+
+		$transactionRef = null;
+		if($msg){
+			$transactionRef = $msg->Reference;
 		}
 		if($transactionRef){
 			$request->setTransactionReference($transactionRef);	
 		}
-		
+
 		$this->createMessage('CaptureRequest', $request);
 		// get response to make sure it is paid.
 		$response = null;
 		try {
 			$response = $this->response = $request->send();
+
+		} catch (Omnipay\Common\Exception\OmnipayException $e) {
+			$this->createMessage("CaptureError", $e);
+		}
+
+		return $gatewayresponse;
+	}
+
+	/**
+	 * Complete capture, after a callback returns from the payment processor.
+	 * This is ususally only called by PaymentGatewayController.
+	 * @return PaymentResponse encapsulated response info
+	 */
+	public function completeCapture($data = array()) {
+
+		$gatewayresponse = $this->createGatewayResponse();
+
+		//set the client IP address, if not already set
+		if(!isset($data['clientIp'])){
+			$data['clientIp'] = Controller::curr()->getRequest()->getIP();
+		}
+
+		$gatewaydata = array_merge($data, array(
+			'amount' => (float) $this->payment->MoneyAmount,
+			'currency' => $this->payment->MoneyCurrency
+		));
+
+		$this->payment->extend('onBeforeCompleteCapture', $gatewaydata);
+		$request = $this->oGateway()->completeCapture($gatewaydata);
+		$this->payment->extend('onAfterCompleteCapture', $request);
+
+		$this->createMessage('CompleteCaptureRequest', $request);
+		$response = null;
+		try {
+			$response = $this->response = $request->send();
+			$this->extend('onAfterSendCompleteCapture', $request, $response);
 			$gatewayresponse->setOmnipayResponse($response);
 			if ($response->isSuccessful()) {
-				// This $response should be CaptureResponse
-
-				$this->createMessage('CapturedResponse', $response);
+				$this->createMessage('CompleteCaptureResponse', $response);
 				$this->payment->Status = 'Captured';
 				$this->payment->write();
+
 				$this->payment->extend('onCaptured', $gatewayresponse);
 			} else {
+				// throw error msg
 				$this->createMessage('CaptureError', $response);
 			}
 		} catch (Omnipay\Common\Exception\OmnipayException $e) {
@@ -197,10 +230,6 @@ class AuthorizeCaptureService extends PaymentService{
 		}
 
 		return $gatewayresponse;
-
-
-		// return reponse
-
 	}
 
 	/**
@@ -212,7 +241,6 @@ class AuthorizeCaptureService extends PaymentService{
 
 	public function cancelAuthorize(){
 		// connect to Quickpay and cancel payment
-
 		$this->payment->Status = 'Void';
 		$this->payment->write();
 		$this->createMessage('VoidRequest', array(

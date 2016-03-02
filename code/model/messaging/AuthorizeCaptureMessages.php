@@ -27,6 +27,12 @@ class CaptureRequest extends GatewayRequestMessage{
 class CapturedResponse extends GatewayResponseMessage{
 
 }
+class CompleteCaptureRequest extends GatewayRequestMessage{
+
+}
+class CompleteCaptureResponse extends GatewayResponseMessage{
+
+}
 class CaptureError extends GatewayErrorMessage{
 	
 }
