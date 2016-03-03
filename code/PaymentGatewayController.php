@@ -22,11 +22,13 @@ class PaymentGatewayController extends Controller{
 	 * @return string                          the resulting redirect url
 	 */
 	public static function get_endpoint_url($action, $identifier) {
+		
 		return Director::absoluteURL(
 			Controller::join_links('paymentendpoint', $identifier, $action)
 		);
+		
 		// modded to go through ngrok instead, so we can test callbacks locally
-		//return "http://224cc5a8.ngrok.io/paymentendpoint/" . $identifier . '/' . $action;
+		//return Config::inst()->get('Object','localcallback') . "/paymentendpoint/" . $identifier . '/' . $action;
 	}
 
 	/**
@@ -35,7 +37,7 @@ class PaymentGatewayController extends Controller{
 	 * but will not update the Payment/Transaction models if they are not found,
 	 * or allowed to be updated.
 	 */
-	public function index() {		
+	public function index() {
 		$payment = $this->getPayment();
 		if (!$payment) {
 			return $this->httpError(404, _t("Payment.NOTFOUND", "Payment could not be found."));
@@ -72,7 +74,6 @@ class PaymentGatewayController extends Controller{
 				break;
 			case "capture":
 				// do capture method
-
 				$service->completeCapture();
 				break;
 			case "cancel":
