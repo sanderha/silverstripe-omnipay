@@ -3,56 +3,89 @@
 class RefundService extends PaymentService{
 
 	/**
-	 * Return money to the previously charged credit card.
-	 * @return PaymentResponse encapsulated response info
+	 * Call omnipay to refund payment
 	 */
 	public function refund($data = array()) {
-		if ($this->payment->Status !== 'Captured') {
-			return null; //could be handled better? send payment response?
-		}
-		if (!$this->payment->isInDB()) {
-			$this->payment->write();
-		}
 
-		if(empty($data['receipt'])) {
-			return null;
-		}
+		// get payment info and transactionreference
+		// some use more messages for "complete" methods, while others, like Stripe, do it without "complete"
+		$msg = $this->payment->Messages()->filter(array('ClassName' => 'AuthorizedResponse'))->Last();
 
-		$message = $this->createMessage('RefundRequest');
-		$message->write();
-		$request = $this->oGateway()->refund(array_merge(
-			$data,
-			array(
-				'amount' => (float) $this->payment->MoneyAmount,
-				'receipt' => (int) $data['receipt'],
-			)
+		$gatewaydata = array_merge($data, array(
+			'amount' => (float) $this->payment->MoneyAmount,
+			'transactionId' => $this->payment->OrderID // Why is this so neccesary to have? answer = omnipay wants it
 		));
-		$this->logToFile($request->getParameters(), 'RefundRequest_post');
+		if(!isset($gatewaydata['notifyUrl'])){
+			$gatewaydata['notifyUrl'] = $this->getEndpointURL("refund", $this->payment->Identifier);
+		}
+
+		// get gateway
+		// call cancel method on the gateway
+		$request = $this->oGateway()->refund($gatewaydata);
+
+		$transactionRef = null;
+		if($msg){
+			$transactionRef = $msg->Reference;
+		}
+		if($transactionRef){
+			$request->setTransactionReference($transactionRef);
+		}
+
+		$this->createMessage('RefundRequest', $request);
+
+		$response = null;
+		try {
+			return $request->send();
+		} catch (Omnipay\Common\Exception\OmnipayException $e) {
+			$this->createMessage("RefundError", $e);
+		}
+		return false;
+	}
+
+	/**
+	 * Update our system that the payment was refunded
+	 *
+	 */
+	public function completeRefund($data = array()){
+
 		$gatewayresponse = $this->createGatewayResponse();
+
+		//set the client IP address, if not already set
+		if(!isset($data['clientIp'])){
+			$data['clientIp'] = Controller::curr()->getRequest()->getIP();
+		}
+
+		$gatewaydata = array_merge($data, array(
+			'amount' => (float) $this->payment->MoneyAmount,
+			'currency' => $this->payment->MoneyCurrency
+		));
+
+		$this->payment->extend('onBeforeCompleteRefund', $gatewaydata);
+		$request = $this->oGateway()->completeRefund($gatewaydata);
+		$this->payment->extend('onAfterCompleteRefund', $request);
+
+		$this->createMessage('CompleteRefundRequest', $request);
+		$response = null;
 		try {
 			$response = $this->response = $request->send();
-			//update payment model
-			if ($response->isSuccessful()) {
-				//successful payment
-				$this->createMessage('RefundedResponse', $response);
-				$this->payment->Status = 'Refunded';
-				$gatewayresponse->setMessage('Payment refunded');
-				$this->payment->extend('onRefunded', $gatewayresponse);
-			} else {
-				//handle error
-				$this->createMessage('RefundError', $response);
-				$gatewayresponse->setMessage(
-					"Error (".$response->getCode()."): ".$response->getMessage()
-				);
-			}
-			$this->payment->write();
+			$this->extend('onAfterSendCompleteRefund', $request, $response);
 			$gatewayresponse->setOmnipayResponse($response);
+			if ($response->isSuccessful()) {
+				$this->createMessage('RefundedResponse', $response);
+				$this->payment->Status = "Refunded";
+				$this->payment->write();
+
+				$this->payment->extend('onRefund', $gatewayresponse);
+			} else {
+				// throw error msg
+				$this->createMessage('RefundError', $response);
+			}
 		} catch (Omnipay\Common\Exception\OmnipayException $e) {
-			$this->createMessage('GatewayErrorMessage', $e);
-			$gatewayresponse->setMessage($e->getMessage());
+			$this->createMessage("RefundError", $e);
 		}
 
 		return $gatewayresponse;
+
 	}
 
 }
