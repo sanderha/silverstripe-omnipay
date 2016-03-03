@@ -3,6 +3,9 @@
 class VoidRequest extends GatewayRequestMessage{
 	
 }
+class CompleteVoidRequest extends GatewayRequestMessage{
+
+}
 class VoidedResponse extends GatewayResponseMessage{
 	
 }
