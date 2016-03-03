@@ -13,9 +13,11 @@ class VoidService extends PaymentService{
 
 		$gatewaydata = array_merge($data, array(
 			'amount' => (float) $this->payment->MoneyAmount,
-			'transactionId' => $this->payment->OrderID, // Why is this so neccesary to have? answer = omnipay wants it
-			'notifyUrl' => $this->getEndpointURL("cancel", $this->payment->Identifier)
+			'transactionId' => $this->payment->OrderID // Why is this so neccesary to have? answer = omnipay wants it
 		));
+		if(!isset($gatewaydata['notifyUrl'])){
+			$gatewaydata['notifyUrl'] = $this->getEndpointURL("cancel", $this->payment->Identifier);
+		}
 
 		// get gateway
 		// call cancel method on the gateway
