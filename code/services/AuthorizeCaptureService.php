@@ -138,6 +138,7 @@ class AuthorizeCaptureService extends PaymentService{
 			}
 		} catch (Omnipay\Common\Exception\OmnipayException $e) {
 			$this->createMessage("CompleteAuthorizeError", $e);
+			$gatewayresponse->setMessage($e->getMessage());
 		}
 
 		return $gatewayresponse;
@@ -181,6 +182,7 @@ class AuthorizeCaptureService extends PaymentService{
 
 		} catch (Omnipay\Common\Exception\OmnipayException $e) {
 			$this->createMessage("CaptureError", $e);
+			$gatewayresponse->setMessage($e->getMessage());
 		}
 
 		return $gatewayresponse;
@@ -227,6 +229,7 @@ class AuthorizeCaptureService extends PaymentService{
 			}
 		} catch (Omnipay\Common\Exception\OmnipayException $e) {
 			$this->createMessage("CaptureError", $e);
+			$gatewayresponse->setMessage($e->getMessage());
 		}
 
 		return $gatewayresponse;
