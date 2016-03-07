@@ -134,7 +134,7 @@ class AuthorizeCaptureService extends PaymentService{
 				$this->payment->Status = 'Pending Authorization';
 				$this->payment->write();
 
-				$this->payment->extend('onAuthorized', $gatewayresponse);
+				$this->payment->extend('onPendingAuthorize', $gatewayresponse);
 			}
 		} catch (Omnipay\Common\Exception\OmnipayException $e) {
 			$this->createMessage("CompleteAuthorizeError", $e);
