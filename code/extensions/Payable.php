@@ -27,7 +27,7 @@ class Payable extends DataExtension {
 		$paid = 0;
 		if ($payments = $this->owner->Payments()) {
 			foreach ($payments as $payment) {
-				if ($payment->Status == 'Captured') {
+				if ($payment->Status == 'Authorized' || $payment->Status == 'Captured') {
 					$paid += $payment->Amount;
 				}
 			}
