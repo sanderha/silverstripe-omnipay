@@ -156,11 +156,12 @@ class AuthorizeCaptureService extends PaymentService{
 		// some use more messages for "complete" methods, while others, like Stripe, do it without "complete"
 		$msg = $this->payment->Messages()->filter(array('ClassName' => 'AuthorizedResponse'))->Last();
 		
-		$gatewaydata = array_merge($data, array(
+		// make sure that values form $data can overwrite when merging arrays
+		$gatewaydata = array_merge(array(
 			'amount' => (float) $this->payment->MoneyAmount,
 			'transactionId' => $this->payment->OrderID, // Why is this so neccesary to have?
 			'notifyUrl' => $this->getEndpointURL("capture", $this->payment->Identifier)
-		));
+		), $data);
 
 		// get gateway
 		// call capture method on the gateway
