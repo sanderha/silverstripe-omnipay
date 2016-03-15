@@ -135,7 +135,7 @@ class PurchaseService extends PaymentService
 				$this->createMessage('PurchasedResponse', $response);
 				$this->payment->Status = 'Captured';
 				$this->payment->write();
-				$this->payment->extend('onCaptured', $gatewayresponse);
+				$this->payment->extend('onCaptured', $response);
 			} else {
 				$this->createMessage('CompletePurchaseError', $response);
 			}
