@@ -155,7 +155,7 @@ class AuthorizeCaptureService extends PaymentService{
 		// get payment info and transactionreference
 		// some use more messages for "complete" methods, while others, like Stripe, do it without "complete"
 		$msg = $this->payment->Messages()->filter(array('ClassName' => 'AuthorizedResponse'))->Last();
-		
+
 		// make sure that values form $data can overwrite when merging arrays
 		$gatewaydata = array_merge(array(
 			'amount' => (float) $this->payment->MoneyAmount,
@@ -203,11 +203,9 @@ class AuthorizeCaptureService extends PaymentService{
 			$data['clientIp'] = Controller::curr()->getRequest()->getIP();
 		}
 
-		$gatewaydata = array_merge($data, array(
-			'amount' => (float) $this->payment->MoneyAmount,
-			'currency' => $this->payment->MoneyCurrency
-		));
+		$gatewaydata = $data;
 
+		// completecapture exists to varify the callback.
 		$this->payment->extend('onBeforeCompleteCapture', $gatewaydata);
 		$request = $this->oGateway()->completeCapture($gatewaydata);
 		$this->payment->extend('onAfterCompleteCapture', $request);
@@ -220,10 +218,12 @@ class AuthorizeCaptureService extends PaymentService{
 			$gatewayresponse->setOmnipayResponse($response);
 			if ($response->isSuccessful()) {
 				$this->createMessage('CompleteCaptureResponse', $response);
+
 				$this->payment->Status = 'Captured';
 				$this->payment->write();
 
-				$this->payment->extend('onCaptured', $gatewayresponse);
+				// we want direct access to the $response here. $gatewayresponse doesnt give all the methods on that specific driver
+				$this->payment->extend('onCaptured', $response);
 			} else {
 				// throw error msg
 				$this->createMessage('CaptureError', $response);
