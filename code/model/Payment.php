@@ -178,9 +178,15 @@ final class Payment extends DataObject{
 	 * @return boolean completion
 	 */
 	public function isComplete() {
-		return $this->Status == 'Captured' ||
-			$this->Status == 'Refunded' ||
-			$this->Status == 'Void';
+		if($this->Status == 'Captured'){
+			// check if there is an authorized payment present with remaining money
+			// this would mean there is still money that can be captured and therefore the "payment" is not completely complete
+			$payments = Payment::get()->filter(array('OrderID' => $this->OrderID, 'Status' => 'Authorized'));
+			if($payments->exists() && $payments->filter('Money.amount:GreaterThan', '0')->exists()){
+				return false;
+			}
+		}
+		return $this->Status == 'Refunded' || $this->Status == 'Void';
 	}
 
 	/**
