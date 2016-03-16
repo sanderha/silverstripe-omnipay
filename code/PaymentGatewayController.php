@@ -95,6 +95,7 @@ class PaymentGatewayController extends Controller{
 		return Payment::get()
 				->filter('Identifier', $this->request->param('Identifier'))
 				->filter('Identifier:not', "")
+				->filterAny('Status',array('Authorized','Pending Authorization'))
 				->first();
 	}
 
