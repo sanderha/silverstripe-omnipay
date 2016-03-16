@@ -75,7 +75,7 @@ class VoidService extends PaymentService{
 				$this->payment->Status = "Void";
 				$this->payment->write();
 
-				$this->payment->extend('onVoid', $gatewayresponse);
+				$this->payment->extend('onVoid', $response);
 			} else {
 				// throw error msg
 				$this->createMessage('VoidError', $response);
