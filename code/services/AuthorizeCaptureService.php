@@ -128,13 +128,15 @@ class AuthorizeCaptureService extends PaymentService{
 				$this->payment->Status = 'Authorized';
 				$this->payment->write();
 
-				$this->payment->extend('onAuthorized', $gatewayresponse);
+				$this->payment->extend('onAuthorized', $response);
 			} else {
-				$this->createMessage('AuthorizedResponse', $response);
-				$this->payment->Status = 'Pending Authorization';
-				$this->payment->write();
+				if($this->payment->Status != 'Authorized'){
+					$this->createMessage('AuthorizedResponse', $response);
+					$this->payment->Status = 'Pending Authorization';
+					$this->payment->write();
 
-				$this->payment->extend('onPendingAuthorize', $gatewayresponse);
+					$this->payment->extend('onPendingAuthorize', $response);
+				}
 			}
 		} catch (Omnipay\Common\Exception\OmnipayException $e) {
 			$this->createMessage("CompleteAuthorizeError", $e);
@@ -195,7 +197,6 @@ class AuthorizeCaptureService extends PaymentService{
 	 * @return PaymentResponse encapsulated response info
 	 */
 	public function completeCapture($data = array()) {
-
 		$gatewayresponse = $this->createGatewayResponse();
 
 		//set the client IP address, if not already set
