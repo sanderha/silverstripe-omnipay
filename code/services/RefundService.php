@@ -75,7 +75,7 @@ class RefundService extends PaymentService{
 				$this->payment->Status = "Refunded";
 				$this->payment->write();
 
-				$this->payment->extend('onRefund', $gatewayresponse);
+				$this->payment->extend('onRefund', $response);
 			} else {
 				// throw error msg
 				$this->createMessage('RefundError', $response);
