@@ -75,9 +75,9 @@ class AuthorizeCaptureService extends PaymentService{
 
 			} elseif ($response->isRedirect()) {
 				// redirect to off-site payment gateway
-				// Make sure payment is just set to created, because we havent handled callbacks yet
+				// Make sure payment is just set to pending, because we havent handled callbacks yet
 				$this->createMessage('AuthorizeRedirectResponse', $response);
-				$this->payment->Status = 'Created';
+				$this->payment->Status = 'Pending Authorization';
 				$this->payment->write();
 				$gatewayresponse->setMessage("Redirecting to gateway");
 			} else {
