@@ -157,7 +157,7 @@ class AuthorizeCaptureService extends PaymentService{
 
 		// get payment info and transactionreference
 		// some use more messages for "complete" methods, while others, like Stripe, do it without "complete"
-		$msg = $this->payment->Messages()->filter(array('ClassName' => 'AuthorizedResponse'))->Last();
+		$msg = $this->payment->Messages()->filter(array('ClassName' => 'AuthorizedResponse'));
 
 		// make sure that values form $data can overwrite when merging arrays
 		$gatewaydata = array_merge(array(
@@ -171,8 +171,12 @@ class AuthorizeCaptureService extends PaymentService{
 		$request = $this->oGateway()->capture($gatewaydata);
 
 		$transactionRef = null;
-		if($msg){
-			$transactionRef = $msg->Reference;
+		if($msg->exists()){
+			foreach($msg as $item){
+				if($item->Reference){
+					$transactionRef = $msg->First()->Reference;
+				}
+			}
 		}
 		if($transactionRef){
 			$request->setTransactionReference($transactionRef);	
