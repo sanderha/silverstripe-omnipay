@@ -174,7 +174,7 @@ class AuthorizeCaptureService extends PaymentService{
 		if($msg->exists()){
 			foreach($msg as $item){
 				if($item->Reference){
-					$transactionRef = $msg->First()->Reference;
+					$transactionRef = $item->Reference;
 				}
 			}
 		}
