@@ -180,7 +180,7 @@ class GatewayResponse{
         		text-align: center;
         		font-family: Verdana, sans-serif;
         	}
-        	div, form {
+        	div {
         		position: absolute;
 				left: 0;
 				right: 0;
@@ -200,10 +200,6 @@ class GatewayResponse{
         	}
         	i.fa {
         		font-size: 30px;
-        	}
-        	form {
-        		z-index: 2;
-				bottom: 0;
         	}
         	p {
         		font-size: 13px;
@@ -229,11 +225,11 @@ class GatewayResponse{
 			<i class="fa fa-refresh fa-spin"></i>
 			<br/>
 			<p>Du viderestilles nu til betaling</p>
+			<form action="%1$s" method="post">
+				%2$s
+				<input type="submit" value="Tryk her hvis du ikke viderestilles automatisk" />
+        	</form>
     	</div>
-        <form action="%1$s" method="post">
-			%2$s
-			<input type="submit" value="Tryk her hvis du ikke viderestilles automatisk" />
-        </form>
     </body>
 </html>';
 			$output = sprintf(
